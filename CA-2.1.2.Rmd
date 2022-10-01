@@ -1,0 +1,28 @@
+UNIVARIATE ANALYSES
+
+```{r}
+summary(iris)
+table(iris$Species)
+```
+
+BIVARIATE ANALYSES
+Target: sepal length (continuous)
+
+```{r}
+# Correlation
+cor(iris$Sepal.Length,iris$Sepal.Width)
+cor(iris[, -5])
+```
+
+```{r}
+# Statistics by level
+library(dplyr)
+iris %>%
+  group_by(Species) %>%                       # provide the factor
+  summarise(Means   = mean(Sepal.Length),     # list statistic we need
+            Medians = median(Sepal.Length),
+            Freq    = n())
+
+# The changing means and medians indicate that the iris species has a visible influence on the sepal length, so we anticipate Species to be a useful predictor.
+```
+

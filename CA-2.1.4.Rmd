@@ -1,0 +1,92 @@
+REVISITING "STUDENT DATA: PART 1"
+
+Read the data
+```{r}
+student <- read.csv(file = "filepath/student_grades.csv", stringsAsFactors = T)
+```
+
+Quick peek
+```{r}
+summary(student)
+```
+
+Loading package
+```{r}
+library(dplyr)  # or library(tidyverse)
+```
+
+select: grab columns
+- specify column names; start names with - to drop columns instead
+
+filter: grab rows
+- specify logical statements
+
+mutate: create a new column
+- specify new column's name and formula
+
+arrange: sort by a column
+- specify column name for ascending; wrap column name in desc() for descending
+
+Without pipes
+```{r}
+select(arrange(mutate(filter(student, G3 < 5), grade.diff = G3 - G2), grade.diff), grade.diff, address, reason)
+```
+
+With pipes
+```{r}
+student %>% 
+  filter(G3 < 5) %>% 
+  mutate(grade.diff = G3 - G2) %>% 
+  arrange(grade.diff) %>% 
+  select(grade.diff, address, reason)
+```
+
+Minor tweaks
+```{r}
+# Keep observations with G3 between 0 and 20
+student2 <- student[(student$G3 >= 0) & (student$G3 <= 20), ]
+summary(student2$G3)
+
+
+
+
+
+# Define new variable: average of G1, G2, and G3
+student2$newgrade <- (student2$G1 + student2$G2 + student2$G3) / 3
+
+
+```
+
+Objective: explore variables newgrade, absences, and Mjob
+```{r}
+# Univariate
+summary(student2$newgrade)
+summary(student2$absences)
+summary(student2$Mjob)
+
+
+
+library(ggplot2)
+ggplot(data = student2, mapping = aes(x = newgrade)) +
+  geom_histogram()
+
+ggplot(data = student2, mapping = aes(x = absences)) +
+  geom_histogram()
+
+# Bivariate
+cor(student2$newgrade, student2$absences)
+
+ggplot(data = student2, mapping = aes(x = absences, y = newgrade)) +
+  geom_point()
+
+library(dplyr)
+student2 %>%
+  group_by(Mjob) %>%
+  summarise(Means   = mean(newgrade),
+            Medians = median(newgrade),
+            Freq    = n()) 
+
+ggplot(data = student2, mapping = aes(x = Mjob, y = newgrade)) +
+  geom_boxplot()
+```
+

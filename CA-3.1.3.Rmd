@@ -1,0 +1,38 @@
+RANDOM GENERATOR BASICS
+
+```{r}
+
+```
+
+```{r}
+
+
+```
+
+
+PARTITION iris DATASET
+
+```{r}
+# Get randomized indices from createDataPartition
+
+
+library(caret)
+
+
+ind <- createDataPartition(iris$Sepal.Length, p = 0.5, list = F)
+
+length(ind)
+head(ind)
+
+# Create training and test sets
+train <- iris[ind, ]
+test <- iris[-ind, ]
+
+head(train)
+head(test)
+
+# Verify stratification
+mean(train$Sepal.Length)
+mean(test$Sepal.Length)
+```
+

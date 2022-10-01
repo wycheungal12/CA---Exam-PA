@@ -1,0 +1,99 @@
+IFS
+
+Objective: output a message whether x is 5 or not
+
+
+Use if...else in writing a function that finds the fourth root
+```{r}
+frrt <- function(b) {
+  if (b >= 0) {
+    return(b^(1 / 4))
+  } else {
+    return("Please enter a non-negative number, thanks ;)")
+  }
+}
+```
+
+```{r}
+# 5 if versicolor, 1 otherwise
+x <- 10/3
+if (x ==5) {
+  print("x is 5")
+} else{
+  print("x is not 5")
+}
+```
+
+Objective: create a new vector from Species
+```{r}
+# 5 if versicolor, 1 otherwise
+ifelse(iris$Species =="versicolor",5,1)
+```
+
+MISC MANIP 1 - Counting
+```{r}
+F+T
+T+T
+sum(1:8 >=5)
+```
+
+How many irises have a petal length shorter than 2?
+```{r}
+sum(iris$Petal.Length < 2)
+```
+
+MISC MANIP 2 - Matching
+```{r}
+(c("A","B","C","D") =="B") |(c("A","B","C","D") =="D")
+```
+
+How many irises have a petal length of 1 or 2 or ... or 6?
+```{r}
+sum(iris$Petal.Length %in% 1:6)
+```
+
+MISC MANIP 3 - paste
+
+Setup
+```{r}
+new.iris <-iris
+new.iris$oddeven <- c("O","E")
+```
+
+Merging character objects
+```{r}
+paste("a","b","c")
+paste("a","b","c", sep="+")
+paste0("a","b","c")
+
+paste(1:3, collapse = "+")
+
+paste(new.iris$Species, new.iris$oddeven, sep = "-")
+```
+
+PIPES
+
+A nesting nightmare
+```{r}
+sd(apply(select(iris, -Species), MARGIN = 2, FUN = mean))
+```
+
+Loading package
+```{r}
+library(dplyr)
+```
+
+select: grab columns
+- first argument = data frame
+- following arguments = column names; start names with - to drop columns instead
+
+
+A better way
+```{r}
+ iris %>% #ctrl+shif+m
+  select(-Species) %>% 
+  apply(MARGIN = 2, FUN = mean) %>% 
+  sd()
+```
+
+

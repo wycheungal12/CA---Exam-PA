@@ -1,0 +1,58 @@
+```{r}
+# Use this function to create plots of deviance residuals
+# By default, produces the Residual vs Fitted plot; change type to anything else for the Normal Q-Q plot
+CAglmplot <- function(mod, type = 1) {
+    iid <- 1L:3
+    text.id <- function(x, y, ind) {
+        text(x, y, names(residuals(mod))[ind], cex = 0.75, xpd = TRUE, pos = c(4, 2)[1 + as.numeric(x > mean(range(x)))], offset = 0.25)
+    }
+    cal <- mod$call
+    if (!is.na(m.f <- match("formula", names(cal)))) {
+        cal <- cal[c(1, m.f)]
+        names(cal)[2L] <- ""
+    }
+    cc <- deparse(cal, 80)
+    nc <- nchar(cc[1L], "c")
+    abbr <- length(cc) > 1 || nc > 75
+    sub.caption <- if (abbr) {
+        paste(substr(cc[1L], 1L, min(75L, nc)), "...")
+    } else {
+        cc[1L]
+    }
+    if (type == 1) {
+        r <- residuals(mod, type = "deviance")
+        yh <- predict(mod)
+        show.r <- sort.list(abs(r), decreasing = TRUE)[iid]
+        getCaption <- as.graphicsAnnot("Residuals vs Fitted")
+        ylim <- extendrange(r = range(r, na.rm = TRUE), f = 0.08)
+        plot(yh, r, xlab = "Predicted values", ylab = "Residuals", main = "", ylim = ylim, type = "n")
+        panel.smooth(yh, r, iter = 0)
+        title(sub = sub.caption)
+        mtext(getCaption, 3, 0.25, cex = 1)
+        y.id <- r[show.r]
+        y.id[y.id < 0] <- y.id[y.id < 0] - strheight(" ")/3
+        text.id(yh[show.r], y.id, show.r)
+        abline(h = 0, lty = 3, col = "gray")
+        rm(abbr, cal, cc, getCaption, iid, m.f, nc, r, show.r, sub.caption, text.id, y.id, yh, ylim)
+    } else {
+        dropInf <- function(x, h) {
+            if (any(isInf <- h >= 1)) {
+                warning(gettextf("not plotting observations with leverage one:\n  %s", paste(which(isInf), collapse = ", ")), call. = FALSE, domain = NA)
+                x[isInf] <- NaN
+            }
+            x
+        }
+        r <- dropInf(rstandard(mod, type = "deviance"), (influence(mod, do.coef = FALSE))$hat)
+        show.r <- sort.list(abs(r), decreasing = TRUE)[iid]
+        getCaption <- as.graphicsAnnot("Normal Q-Q")
+        ylim <- range(r, na.rm = TRUE)
+        ylim[2L] <- ylim[2L] + diff(ylim) * 0.075
+        qq <- qqnorm(r, main = "", ylab = "Std. deviance resid.", ylim = ylim)
+        qqline(r, lty = 3, col = "gray50")
+        title(sub = sub.caption)
+        mtext(getCaption, 3, 0.25, cex = 1)
+        text.id(qq$x[show.r], qq$y[show.r], show.r)
+        rm(abbr, cal, cc, dropInf, getCaption, iid, m.f, nc, qq, r, show.r, sub.caption, text.id, ylim)
+    }
+}
+```

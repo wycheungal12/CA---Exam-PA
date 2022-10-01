@@ -1,0 +1,107 @@
+ADVANCED CODING
+
+Advanced means:
+- powerful but optional to know from memory
+- know how to read and use it if provided
+- more of a nice-to-have, not necessity
+
+
+WRITING FUNCTIONS
+
+Formula: x^2 - ln(y)
+Write the formula into a function
+```{r}
+form <- function(x,y){
+  x^2-log(y)
+}
+form(3,5)
+form(3:5,8:10)
+```
+
+A function running multiple lines
+
+The function in action
+```{r}
+meanvar <- function(vector){
+  m <- mean(vector)
+  v <- var(vector)
+  return(c(m,v))
+}
+meanvar(3:5)
+```
+
+LOOPS
+
+Check out the iris dataset
+```{r}
+dim(iris)
+head(iris)
+```
+
+Objective: vector of cumulative petal lengths
+```{r}
+c(iris$Petal.Width[1],
+  sum(iris$Petal.Length[1:2]),
+  sum(iris$Petal.Length[1:3]))
+```
+
+for loop: stop at a specified end
+```{r}
+cpl <- iris$Petal.Length[1]
+for (i in 2:150) {
+  val <- cpl[i - 1] + iris$Petal.Length[i]
+  cpl <- c(cpl, val)
+}
+
+cpl
+```
+
+while loop: stop at a false condition
+```{r}
+i <- 1
+while (cpl[i] < 10) {
+  i <- i + 1
+}
+
+i
+```
+
+
+FAMILY OF apply FUNCTIONS
+
+Runs a function repeatedly
+```{r}
+mean(iris$Sepal.Length)
+mean(iris$Petal.Length)
+mean(iris$Petal.Width)
+```
+
+Objective: average for the numeric columns 
+
+apply
+- X
+- MARGIN
+- FUN
+```{r}
+apply(X=iris[, -5],MARGIN = 2, FUN=mean)
+```
+
+Factors
+```{r}
+iris$Species
+```
+
+Objective: average petal length for each species
+```{r}
+mean(iris$Petal.Length[iris$Species == "setosa"])
+mean(iris$Petal.Length[iris$Species == "versicolor"])
+mean(iris$Petal.Length[iris$Species == "virginica"])
+```
+
+tapply
+- X
+- INDEX
+- FUN
+```{r}
+tapply(iris$Petal.Length, iris$Species, FUN = mean)
+```

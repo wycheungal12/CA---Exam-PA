@@ -1,0 +1,715 @@
+Read the data
+```{r}
+hosp <- read.csv(file = "readmission.csv", stringsAsFactors = T)
+```
+
+Quick peek
+```{r}
+summary(hosp)
+```
+
+Objective: explore variables Readmission.Status, Age, and Race
+```{r}
+# Univariate
+library(ggplot2)
+ggplot(data = hosp , mapping = aes(x = Age)) +
+  geom_histogram(bins=30)  # a little bit left skewed
+
+# Bivariate
+# numberic vs factor, use side-by-side histogram
+ggplot(data = hosp, mapping = aes(x = Age , fill = factor(Readmission.Status), y=..density..)) +  
+  #change vertical from count to density
+  geom_histogram(position = "dodge", bins=15)
+#age histograms for both groups of patients are similar, so it appears that Age will not help much in predicting Readmission Status
+
+table(hosp$Readmission.Status,hosp$Race)
+
+library(dplyr)
+ hosp %>%
+  group_by(Race) %>%
+  summarise(Proportions = mean(Readmission.Status), # consider readmission as a numeric factor
+  Freq = n())
+ #Hispanic has similar proportion as Black, and has smallest freq, so consider combine these two into one level
+
+ #use stack bar chart for binary target
+ggplot(data = hosp , mapping = aes(x = Race, fill = factor(Readmission.Status))) +
+  geom_bar(position= "fill" )  # bar heights are fixed at 1
+```
+
+
+TASK 0 - Setup
+
+Read the data
+```{r}
+hosp <- read.csv(file = "readmission.csv", stringsAsFactors = T)
+```
+
+
+TASK 1 - Investigate and consider combining DRG.Class and DRG.Complication
+```{r}
+summary(hosp$DRG.Class)
+summary(hosp$DRG.Complication)
+table(hosp$DRG.Class,hosp$DRG.Complication)
+
+#6 from the surgical class have a medical complication. Removing them should be safe given the size of our dataset.
+
+hosp1 <- hosp
+hosp1 <-hosp[!(hosp$DRG.Class == "SURG" & hosp$DRG.Complication == "MedicalMCC.CC"), ]
+
+
+# combine 2 variables (create compound variable)
+hosp2 <- hosp1
+hosp2$DRG <- factor(paste(hosp1$DRG.Class, hosp1$DRG.Complication))
+
+library(plyr)
+levels(hosp2$DRG)
+hosp2$DRG <- mapvalues(hosp2$DRG, levels(hosp2$DRG), c("Med-CC","Med-NoCC","Med-Other","SURG-Other", "SURG-CC","SURG-NoCC","UNGROUP"))
+
+# remove levels
+hosp3 <- hosp2
+hosp3$DRG.Class <- NULL
+hosp3$DRG.Complication <- NULL
+
+```
+
+
+TASK 2 - Explore all predictors and their relation to Readmission.Status; transform if appropriate
+
+Start with exploring Readmission.Status
+```{r}
+mean(hosp3$Readmission.Status)
+```
+Findings: The average of Readmission Status calculates the proportion of readmitted patients from the dataset.  low rate
+
+Gender
+```{r}
+library(dplyr)
+
+hosp3 %>%
+  group_by(Gender) %>%
+  summarise(Proportions = mean(Readmission.Status),
+            Freq        = n())
+```
+Findings:
+males have a distinctly higher readmission proportion than females. So we can conclude that Gender is predictive of our target, but the difference seems minor at best
+
+Race
+```{r}
+hosp3 %>%
+  group_by(Race) %>%
+  summarise(Proportions = mean(Readmission.Status),
+            Freq        = n())
+
+# African American and Hispanic patients have similar proportions of readmission, and that the Hispanics make up the smallest group of the four levels.  Combine these 2 levels
+hosp4 <- hosp3
+hosp4$Race <- mapvalues(hosp3$Race, levels(hosp$Race), c("Black or Hispanic","Black or Hispanic","Others","White"))
+summary(hosp4$Race)
+```
+Findings: seems predictive
+
+ER
+```{r}
+library(ggplot2)
+
+ggplot(hosp4, aes(x = ER)) +
+  geom_bar()  
+
+ggplot(hosp4, aes(x = ER, fill = factor(Readmission.Status))) +
+  geom_bar(position = "fill")
+
+hosp5 <- hosp4
+hosp5$anyER <- factor(ifelse(hosp4$ER == 0,"N", "Y"))
+
+hosp5 %>%
+  group_by(hosp5$anyER) %>%
+  summarise(Proportions = mean(Readmission.Status),
+            Freq        = n())
+
+hosp5$ER <- NULL
+
+```
+Findings:
+heavily right-skewed, combine all values greater than 0
+
+LOS
+```{r}
+ggplot(hosp5, aes(x = LOS)) +
+  geom_bar()
+
+ggplot(hosp5, aes(x = LOS, fill = factor(Readmission.Status))) +
+  geom_bar(position = "fill")
+
+# Abby (1 LOS) vs. Bruce (6 LOS)
+# Bruce perhaps more likely to readmit than Abby
+
+# Carmen (20 LOS) vs. Dan (30 LOS)
+# Readmission chances not necessarily very different
+
+# smaller value of Los has bigger impact on readmission --> good candidate for log transformation
+
+ggplot(hosp5, aes(x = log(LOS))) +
+  geom_histogram(bins = 15)
+
+ggplot(hosp, aes(x = log(LOS), fill = factor(Readmission.Status), y = ..density..)) +
+  geom_histogram(position = "dodge", bins = 15)
+
+hosp5$lnLOS <- log(hosp5$LOS)
+hosp6 <- hosp5
+hosp6$LOS <- NULL
+```
+Findings:
+heavier blue right tail compared to the red right tail --> the natural log of LOS seems predictive.
+
+Age
+```{r}
+ggplot(hosp6, aes(x = Age)) +
+  geom_histogram()
+
+ggplot(hosp6, aes(x = Age, fill = factor(Readmission.Status), y = ..density..)) +
+  geom_histogram(position = "dodge", bins = 15)
+```
+Findings:
+distribution is quite similar for readmission or not, not a good predictor
+
+HCC.Riskscore
+```{r}
+ggplot(hosp6, aes(x = HCC.Riskscore)) +
+  geom_histogram()
+
+ggplot(hosp6, aes(x = HCC.Riskscore, fill = factor(Readmission.Status), y = ..density..)) +
+  geom_histogram(position = "dodge", bins = 15)
+
+
+ggplot(hosp6, aes(x = log(HCC.Riskscore))) +
+  geom_histogram()
+
+ggplot(hosp6, aes(x = log(HCC.Riskscore), fill = factor(Readmission.Status), y = ..density..)) +
+  geom_histogram(position = "dodge", bins = 15)
+
+hosp6$lnRiskscore <- log(hosp6$HCC.Riskscore)
+hosp7 <- hosp6
+hosp7$HCC.Riskscore <- NULL
+```
+Findings:
+both are right skewed, but less severe for readmitted 
+better with log transfer
+
+DRG
+```{r}
+hosp7 %>%
+  group_by(DRG) %>%
+  summarise(Proportions = mean(Readmission.Status),
+            Freq        = n()) %>%
+  arrange(Proportions)
+
+# combine levels of other
+hosp8 <- hosp7
+hosp8$DRG <- mapvalues(hosp8$DRG, levels(hosp8$DRG), c("Med-CC","Med-NoCC", "OtherCC", "OtherCC", "SURG-CC", "SURG-NoCC","OtherCC"))
+summary(hosp8$DRG)
+```
+Findings:
+all levels with the complication status Other have the top three proportions. Moreover, these three have low frequency and very different proportions than the remaining four levels. It makes sense to combine all three levels.
+
+TASK 3 - Relevel factors to most frequent level
+
+```{r}
+vars <- c("Gender", "Race", "DRG")
+
+for (i in vars) {
+  table <- as.data.frame(table(hosp8[, i]))
+  max <- which.max(table[, 2])
+  level.name <- as.character(table[max, 1])
+  hosp8[, i] <- relevel(hosp8[, i], ref = level.name)
+}
+```
+
+
+PARTITION DATASET
+
+```{r}
+library(caret)
+
+set.seed(161)
+ind <- createDataPartition(hosp8$Readmission.Status, p = 0.7, list = F)
+
+train <- hosp8[ind, ]
+test <- hosp8[-ind, ]
+
+# rm(ind)
+
+# Verify stratification
+mean(train$Readmission.Status)
+mean(test$Readmission.Status)
+```
+
+
+TASK 4 - Run a logistic regression; assess whether the model suffers from overfitting
+
+```{r}
+# Replace DISTRIBUTION and LINK below
+log.mod1 <- glm(Readmission.Status ~ ., family = binomial, data = train)
+# use canonical link
+# based on the p-values, it makes the most sense to merge "medical CC" with "surgical CC"
+
+summary(log.mod1)
+
+library(pROC)
+
+# Training ROC and AUC
+log.trainroc1 <- roc(train$Readmission.Status, predict(log.mod1, type = "response"))
+par(pty = "s")  #plotting the ROC curves, making them fit a square rather than the rectangular default
+plot(log.trainroc1)
+auc(log.trainroc1)  # or log.trainroc1$auc
+
+# Test ROC and AUC
+log.prob1 <- predict(log.mod1, newdata = test, type = "response")
+log.roc1 <- roc(test$Readmission.Status, log.prob1)
+par(pty = "s")
+plot(log.roc1)
+auc(log.roc1)  # or log.roc1$auc
+#the model does not overfit since the test AUC is actually better than the training AUC
+```
+
+
+TASK 5 - Interpret the model for an audience unfamiliar with predictive analytics; demonstrate using three predictors including both numeric and factor
+
+Chosen predictors: race, age, lnRiskscore
+
+More precise
+```{r}
+exp(coef(log.mod1))
+levels(train$DRG)
+```
+
+- the model predicts the probability that a patient readmits based on 7 variables
+- each variable has a multiplicative impact on the odds of readmission
+- probability is calculated as odds/(1+odds)
+- variables are either numerical or categorical
+- for every increase of 1 in patient age, the predicted odds is multiplied by 0.995,i.e. 0.5% decrease
+- for every increase of 1 in patient log risk score, the predicted odds is 3.687 times larger
+- Black or Hispanic patients have predicted odds 1.077 times larger than white patients, other patients have predicted odds multiplied by 0.957 compared with white patients
+
+More intuitive (i.e. sensitivity analysis)
+```{r}
+#the first prediction will be our base case, and the other five will come from changing the value for just one predictor
+#Change the second value for Age, so the second observation will reveal how the prediction changes with age. For numeric predictors, the norm is to predict at one value lower than the base case and at one value higher as well
+predict(log.mod1,
+        type    = "response",
+        newdata = data.frame(Gender      = c("F", "F", "F", "F", "F", "F"),
+                             Race        = c("White", "White", "White", "White", "White", "Others"),
+                             Age         = c(75, 65, 85, 75, 75, 75),
+                             DRG         = c("Med-CC", "Med-CC", "Med-CC", "Med-CC", "Med-CC", "Med-CC"),
+                             anyER       = c("N", "N", "N", "N", "N", "N"),
+                             lnLOS       = c(1.5, 1.5, 1.5, 1.5, 1.5, 1.5),
+                             lnRiskscore = c(0.5, 0.5, 0.5, 0, 1, 0.5)))
+```
+
+
+TASK 6 - Run a regularized regression of your choice; assume we prefer interpretation over accuracy
+
+```{r}
+#minimizing the negative log-likelihood plus penalty
+trainXmat <- model.matrix(Readmission.Status ~ ., data = train)
+# create a matrix of predictor
+
+library(glmnet)
+
+set.seed(161)
+
+las.cv <- cv.glmnet(x      = trainXmat,
+                y      = train$Readmission.Status,
+                family = "binomial",
+                alpha  = 1)  # This runs lasso
+plot(las.cv)
+
+las.mod1 <- glmnet(x      = trainXmat[, -1],
+              y      = train$Readmission.Status,
+              family = "binomial",
+              lambda = las.cv$lambda.min,
+              alpha  = 1)  # This runs lasso
+
+coef(las.mod1)
+#asso recommends merging "medical CC" and "surgical CC" to form the reference level
+#mod$a0
+#mod$beta
+
+# Calculate test predicted probabilities
+testXmat <- model.matrix(Readmission.Status ~ ., data = test)
+
+las.prob1 <- as.vector(predict(las.mod1, newx = testXmat[, -1], type = "response"))
+```
+
+
+BONUS TASK - Understand a compound variable
+
+```{r}
+ log.mod2 <- glm(Readmission.Status ~ DRG, family = binomial, data = hosp2)
+ log.mod3 <- glm(Readmission.Status ~ DRG.Class * DRG.Complication, family = binomial, data = hosp1)
+
+ head(predict(log.mod2, type = "response"))
+ head(predict(log.mod3, type = "response"))
+ #a compound variable is the same as crossing two factors
+```
+
+
+TASK 7 - Run the following two models and compare them using AUC
+
+Construct a classification tree using function rpart; change cp and/or maxdepth as needed
+```{r}
+library(rpart)
+library(rpart.plot)
+
+set.seed(161)
+tree.mod1 <- rpart(Readmission.Status ~ ., 
+                   data    = train,
+                   method  = "class",
+                   parms   = list(split = "information"),
+                   control = rpart.control(cp       = 0.0008,
+                                           maxdepth = 10))
+
+rpart.plot(tree.mod1, extra = 4)
+tree.mod1
+
+# Calculate tree's test AUC
+library(pROC)
+
+tree.prob1 <- predict(tree.mod1, newdata = test, type = "prob")
+tree.roc1 <- roc(test$Readmission.Status, tree.prob1[, "1"])
+auc(tree.roc1)
+```
+Findings:
+- 18 terminal nodes, has risk of over fitting with cp=0.0005, maxdepth = 10
+- We can infer from the tree that there's a possible interaction between risk score and length of stay. The length of stay only plays a role when the natural log of risk score exceeds or equals 1.8.
+- this tree has a test AUC of 0.715 which is not necessarily low, but with such a large tree, there seems to be a possibility that our test AUC could increase, if we have a smaller tree.
+- cp=0.0008, maxdepth = 10, test auc=0.7155
+
+Construct a classification tree using function train; do not change the code
+```{r}
+library(caret)
+
+set.seed(161)
+tree.cv <- train(y         = factor(train$Readmission.Status),
+                 x         = train[, colnames(train) != "Readmission.Status"],
+                 method    = "rpart",
+                 trControl = trainControl(method = "cv", number = 10),
+                 metric    = "Accuracy",
+                 tuneGrid  = expand.grid(cp = seq(0, 0.0001, 0.00001)),
+                 control   = rpart.control(maxdepth = 6),
+                 parms     = list(split = "information"),
+                 na.action = na.pass)
+
+tree.mod2 <- tree.cv$finalModel
+rpart.plot(tree.mod2, extra = 4)
+
+# Calculate tree's test AUC
+tree.prob2 <- predict(tree.mod2, newdata = test, type = "prob")
+tree.roc2 <- roc(test$Readmission.Status, tree.prob2[, "1"])
+auc(tree.roc2)
+```
+Findings:
+- 16 terminal node, auc 0.7227 the highest
+- a classification tree may not be an ideal model for the hospital data. The tree has to be very large in order to predict the readmission status, which makes it likely we will overfit. 
+- if we review the first tree, there is likely a continuous relationship between risk score and readmission status. The first few splits use the same predictor, the natural log of risk score.
+
+TASK 8 - Reexamine Readmission.Status, identify any potential issues to modeling, and propose a solution
+
+```{r}
+summary(hosp8$Readmission.Status)
+
+table(hosp8$Readmission.Status)
+
+nrow(hosp8[hosp8$Readmission.Status == 0, ]) / nrow(hosp8[hosp8$Readmission.Status == 1, ])
+```
+Findings:
+- readmission status has a low mean. This is caused by having more negative observations than positive observations.
+- For every positive observation in the hospital data, there are approximately 7 negative observations. The target is not severely skewed, but it is fairly unbalanced.
+- classification models may suffer from low sensitivity and high specificity. In order to mitigate this issue, we could employ oversampling
+
+
+TASK 9 - Construct the following random forest model and another random forest model incorporating the solution from Task 8; compare both models and interpret the better model
+
+```{r}
+# Reconfigure datasets
+trainYN <- train
+testYN <- test
+
+trainYN$Readmission.Status <- ifelse(trainYN$Readmission.Status == 1, "Y", "N")
+testYN$Readmission.Status <- ifelse(testYN$Readmission.Status == 1, "Y", "N")
+```
+
+```{r}
+library(caret)
+library(randomForest)
+
+set.seed(161)
+rf.mod1 <- train(y          = trainYN$Readmission.Status,
+                 x          = trainYN[, colnames(trainYN) != "Readmission.Status"],
+                 method     = "rf",
+                 trControl  = trainControl(method          = "cv", 
+                                           number          = 3, 
+                                           summaryFunction = twoClassSummary, 
+                                           classProbs      = T),
+                 metric     = "ROC",
+                 tuneGrid   = expand.grid(mtry = c(2, 4, 7)),
+                 ntree      = 51,
+                 importance = T)
+
+rf.mod1
+plot(rf.mod1)
+#the highest cross-validation AUC occurs with 4 predictors
+```
+
+```{r}
+# With oversampling
+# Alter training dataset manually or specify sampling = "up" in train
+library(caret)
+library(randomForest)
+
+set.seed(161)
+rf.mod2 <- train(y          = trainYN$Readmission.Status,
+                 x          = trainYN[, colnames(trainYN) != "Readmission.Status"],
+                 method     = "rf",
+                 trControl  = trainControl(method          = "cv", 
+                                           number          = 3, 
+                                           summaryFunction = twoClassSummary, 
+                                           sampling = "up",
+                                           classProbs      = T),
+                 metric     = "ROC",
+                 tuneGrid   = expand.grid(mtry = c(2, 4, 7)),
+                 ntree      = 51,
+                 importance = T)
+
+rf.mod2
+plot(rf.mod2)
+# the model decides that we should randomly choose 2 predictors at each split. 
+```
+
+```{r}
+library(pROC)
+
+# Calculate 1st random forest's test AUC
+rf.prob1 <- predict(rf.mod1, newdata = testYN, type = "prob")
+rf.roc1 <- roc(testYN$Readmission.Status, rf.prob1[, "Y"])
+auc(rf.roc1)
+
+# Calculate 2nd random forest's test AUC
+rf.prob2 <- predict(rf.mod2, newdata = testYN, type = "prob")
+rf.roc2 <- roc(testYN$Readmission.Status, rf.prob2[, "Y"])
+auc(rf.roc2)
+```
+Findings:
+-Compare the two fitted random forest models by calculating the test AUCs. The second model finishes with a higher test AUC of 0.7071. Using oversampling to address the skewed data improved our performance
+
+```{r}
+# Interpret model
+
+varImp(rf.mod2)
+# the natural log of risk score proves to be the most important by far in predicting the rate of readmission
+
+# Examine the marginal effect of the most important predictors
+library(pdp)
+
+# Replace VARIABLE below based on previous output
+partial(rf.mod2, pred.var = "lnRiskscore", plot = T, prob = T, which.class = "Y")
+# a higher natural of of risk score, on average, results in a higher readmission rate.
+
+rf.pred2 <- predict(rf.mod2, newdata = testYN, type = "raw")
+confusionMatrix(data = rf.pred2, reference = factor(testYN$Readmission.Status), positive = "Y")
+#With a default cutoff of 0.5, it appears that the model's sensitivity and specificity meet our goal. Neither are too low and neither are too high
+```
+Findings:
+
+
+TASK 10 - Perform cluster analysis of your choice on Age and another numeric variable of your choice; answer the following questions along the way  
+
+Chosen clustering:
+Chosen variable:
+
+```{r}
+
+```
+
+```{r}
+# Hierarchical clustering
+# Possible warning/error: 
+# Error: vector memory exhausted (limit reached?) => Not enough memory to execute code
+# Error: cannot allocate vector of size 16.6 Gb => Not enough memory to execute code
+
+hc.data <- scale(hosp9[, c("Age", "VARIABLE2")])
+
+hc1 <- hclust(dist(hc.data))
+plot(hc1)
+```
+
+```{r}
+# k-means clustering
+# Possible warning/error: Quick-TRANSfer stage steps exceeded maximum (= 3338800) => An issue with using default algorithm; see ?kmeans for more info
+
+km.data <- scale(hosp9[, c("Age", "VARIABLE2")])
+km.ns <- 20
+km.im <- 20
+
+set.seed(161)
+km1 <- kmeans(km.data, centers = 1, nstart = km.ns, iter.max = km.im)
+km2 <- kmeans(km.data, centers = 2, nstart = km.ns, iter.max = km.im)
+km3 <- kmeans(km.data, centers = 3, nstart = km.ns, iter.max = km.im)
+km4 <- kmeans(km.data, centers = 4, nstart = km.ns, iter.max = km.im)
+km5 <- kmeans(km.data, centers = 5, nstart = km.ns, iter.max = km.im)
+km6 <- kmeans(km.data, centers = 6, nstart = km.ns, iter.max = km.im)
+km7 <- kmeans(km.data, centers = 7, nstart = km.ns, iter.max = km.im)
+km8 <- kmeans(km.data, centers = 8, nstart = km.ns, iter.max = km.im)
+km9 <- kmeans(km.data, centers = 9, nstart = km.ns, iter.max = km.im)
+km10 <- kmeans(km.data, centers = 10, nstart = km.ns, iter.max = km.im)
+km11 <- kmeans(km.data, centers = 11, nstart = km.ns, iter.max = km.im)
+km12 <- kmeans(km.data, centers = 12, nstart = km.ns, iter.max = km.im)
+
+var.exp <- data.frame(k = c(1:12),
+                      bss_tss = c(km1$betweenss / km1$totss,
+                                  km2$betweenss / km2$totss,
+                                  km3$betweenss / km3$totss,
+                                  km4$betweenss / km4$totss,
+                                  km5$betweenss / km5$totss,
+                                  km6$betweenss / km6$totss,
+                                  km7$betweenss / km7$totss,
+                                  km8$betweenss / km8$totss,
+                                  km9$betweenss / km9$totss,
+                                  km10$betweenss / km10$totss,
+                                  km11$betweenss / km11$totss,
+                                  km12$betweenss / km12$totss))
+
+library(ggplot2)
+
+ggplot(data = var.exp, aes(x = k, y = bss_tss)) +
+  geom_point() + 
+  geom_line() +
+  ggtitle("Elbow Plot")
+```
+
+Chosen k:
+
+```{r}
+# Visualize clusters
+
+ggplot(hosp9, aes(x = Age, y = VARIABLE, color = factor(CLUSTERS))) + 
+  geom_point()
+```
+
+Determine whether the new variable based on clustering should be used in any of the fitted models in previous tasks; justify using model outputs
+
+```{r}
+# Add new features to dataset
+hosp9$VARIABLE <- factor(CLUSTERS)
+
+# Remove features used
+hosp10 <- hosp9
+
+hosp10$Age <- NULL
+hosp10$VARIABLE2 <- NULL
+
+# Overwrite train and test
+train <- hosp10[ind, ]
+test <- hosp10[-ind, ]
+```
+
+```{r}
+library(dplyr)
+
+hosp10 %>%
+  group_by(VARIABLE) %>%
+  summarise(Proportions = mean(Readmission.Status),
+            Freq        = n()) %>% 
+  arrange(Proportions)
+```
+Findings:
+
+```{r}
+# Logistic regression - Task 4
+summary(log.mod1)
+
+# Lasso regression - Task 6
+library(glmnet)
+
+coef(las.mod1)
+
+# Single decision tree - Task 7
+library(rpart)
+library(rpart.plot)
+
+rpart.plot(tree.mod2, extra = 4)
+
+# Random forest - Task 9
+library(caret)
+
+varImp(rf.mod2)
+```
+
+
+```{r}
+
+```
+Findings:
+
+
+```{r}
+
+```
+Findings:
+
+
+TASK 11 - Recommend a final model from all fitted models and justify your recommendation both quantitatively and qualitatively
+
+```{r}
+library(pROC)
+
+# Logistic regression from Task 4
+auc(log.roc1)
+
+# Lasso regression from Task 6
+las.roc1 <- roc(test$Readmission.Status, las.prob1)
+auc(las.roc1)
+
+# Single decision trees from Task 7 
+auc(tree.roc1)
+auc(tree.roc2)
+
+# Random forest with oversampling from Task 9
+auc(rf.roc2)
+```
+
+```{r}
+
+```
+Findings:
+
+Chosen model:
+
+
+TASK 12 - With the recommended model, set a cutoff to maximize savings
+
+- Saves $100 for every patient who is predicted to readmit and turns out to be readmitted
+- Saves $10 for every patient who is predicted not to readmit and turns out not to be readmitted
+
+```{r}
+# Select at least five cutoffs
+cutoff <- c()
+
+library(caret)
+
+for (i in 1:5) {
+  preds <- (probs > cutoff[i]) * 1
+  
+  cmat <- confusionMatrix(factor(preds), factor(test$Readmission.Status), positive = "1")
+  
+  positives <- cmat$table["1", "1"]
+  negatives <- cmat$table["0", "0"]
+  
+  print(100 * positives + 10 * negatives)
+}
+```
+
+Chosen cutoff:
+
+```{r}
+
+```
+

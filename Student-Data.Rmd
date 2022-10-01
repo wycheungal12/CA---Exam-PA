@@ -1,0 +1,764 @@
+Read the data
+```{r}
+student <- read.csv(file = "student-grades.csv",stringsAsFactors = 1)
+```
+
+Quick peek
+```{r}
+summary(student)
+```
+
+Minor tweaks
+```{r}
+# Keep observations with G3 between 0 and 20
+student2 <- student[(student$G3 >= 0) & (student$G3 <= 20),]
+summary(student2$G3)
+
+# Define new variable: average of G1, G2, and G3
+student2$newgrade <- (student2$G1+student2$G2+student2$G3)/3
+```
+
+Objective: explore variables newgrade, absences, and Mjob
+```{r}
+# Univariate
+summary(student2$newgrade)
+summary(student2$absences)
+summary(student2$Mjob)
+
+
+library(ggplot2)
+# newgrades vs absence, both numeric variables
+ggplot(data = student2, mapping = aes(x = newgrade)) +
+  geom_histogram(bins=30)  # two prominent groupings
+
+ggplot(data = student2, mapping = aes(x = absences)) +
+  geom_histogram(bins=30)  # right skewed
+
+# Bivariate
+cor(student2$newgrade,student2$absences)
+
+ggplot(data = student2, mapping = aes(x =absences, y =newgrade)) +
+  geom_point()
+#for students with 0 absences, we observe high as well as low newgrade values
+
+
+library(dplyr)
+# newgrade vs Mjob, one numeric & one factor variable
+ student2 %>%
+  group_by(Mjob) %>%
+  summarise(Means   = mean(newgrade),
+            Medians = median(newgrade),
+            Freq    = n())
+# at home and other have similar mean and medians.
+# Mjob shows great potential as a predictor because there are statistics that vary across the different levels
+ 
+
+ggplot(data = student2 , mapping = aes(x = Mjob , y = newgrade)) +
+  geom_boxplot()
+```
+
+
+TASK 0 - Setup
+
+Read the data
+```{r}
+student <- read.csv(file = "student-grades.csv", stringsAsFactors = T)
+```
+
+Keep observations with G3 between 0 and 20
+```{r}
+student1 <- student[student$G3>= 0 & student$G3 <= 20, ]
+```
+
+Define new variable: average of G1, G2, and G3
+```{r}
+student1$newgrade<- (student1$G1+student1$G2+student1$G3)/3
+```
+
+Remove G1, G2, and G3
+```{r}
+student2 <-student1
+student2$G1 <- NULL
+student2$G2 <- NULL
+student2$G3 <- NULL
+```
+
+Review dataset
+```{r}
+summary(student2)
+```
+
+
+TASK 1 - Ensure factor columns are factor objects, except famrel, freetime, goout, Dalc, Walc, and health
+
+```{r}
+student3 <- student2
+vars <- c("Medu","Fedu","traveltime", "studytime", "failures")
+
+for (i in vars) {
+  student3[, i] <- factor(student3[, i])
+}
+
+summary(student3)
+```
+
+
+TASK 2 - Explore the following predictors and their relation to newgrade; transform or drop if appropriate; identify most predictive
+
+Start with exploring newgrade
+```{r}
+library(ggplot2)
+
+ggplot(student3, aes(x = newgrade)) +
+  geom_histogram(bins = 15)
+```
+Findings: The histogram has two peaks, which implies there might be two distributions mixed into newgrade
+
+school
+```{r}
+ggplot(student3, aes(x = newgrade, fill = school, y=..density..)) +
+  geom_histogram(position = "dodge", bins = 15)
+
+library(dplyr)
+
+student3 %>%
+  group_by(school) %>%
+  summarise(Means   = mean(newgrade),
+            Medians = median(newgrade),
+            Freq    = n())
+```
+Findings:
+The predictor school seems to be a good predictor, given the clear differences between the two schools.
+It also seems to give an explanation for the two peaks in newgrade, where the right peak may be due to the Marble Hill School students. 
+
+age
+```{r}
+ggplot(student3, aes(x = age)) +
+  geom_histogram(bins=30)
+
+ggplot(student3, aes(x = age, y = newgrade)) +
+  geom_point()
+
+cor(student3$newgrade, student3$age)
+```
+Findings:
+The grade distribution seems to be similar regardless of the age, near-zero correlation. age does not appear predictive.
+some unusual ages for high schoolers.
+
+Medu
+```{r}
+ggplot(student3, aes(x = Medu, y = newgrade)) +
+  geom_boxplot()
+
+student3 %>%
+  group_by(Medu) %>%
+  summarise(Means   = mean(newgrade),
+            Medians = median(newgrade),
+            Freq    = n())
+
+  
+student4 <- student3
+student4 <- student4[student4$Medu !=0, ]
+student4$Medu <- droplevels(student4$Medu)
+
+summary(student4$Medu)
+```
+Findings:
+A general trend of newgrade increasing with Medu, except when Medu is 0
+Medu being 0 produces a mean and median of newgrade that are unusually high. But with only 3 observations. Remove observation with Medu=0
+
+Fedu
+```{r}
+ggplot(student4, aes(x = Fedu, y = newgrade)) +
+  geom_boxplot()
+
+student4 %>%
+  group_by(Fedu) %>%
+  summarise(Means   = mean(newgrade),
+            Medians = median(newgrade),
+            Freq    = n())
+
+#drop obs with Fedu=0
+student5 <- student4
+student5 <- student4[student4$Fedu != 0, ]
+summary(student5$Fedu)
+
+student5$Fedu <- droplevels(student5$Fedu)
+
+library(plyr)
+
+# combine Fedu=2 & 3
+student5$Fedu <- mapvalues(student5$Fedu, levels(student5$Fedu), c("primary","secondary","secondary", "higher") )
+summary(student5$Fedu)
+```
+Findings:
+
+absences
+```{r}
+student6 <- student5
+student6$absences <-NULL
+```
+Findings:
+from the project statement, there's a comment about not knowing the absences before the school year starts, and so it should be removed.
+
+Most predictive looks to be school. it came closest to explaining the two peaks of the newgrade histogram
+
+
+TASK 3 - Relevel factors to most frequent level
+
+```{r}
+student7 <- student6
+vars <- c("school", "sex", "address", "famsize", "Pstatus", "Mjob", "Fjob", "reason", "guardian", "schoolsup", "famsup", "paid", "activities", "nursery", "higher", "internet", "romantic")
+
+for (i in vars) {
+  table <- as.data.frame(table(student7[, i]))
+  max <- which.max(table[, 2])
+  level.name <- as.character(table[max, 1])
+  student7[, i] <- relevel(student7[, i], ref = level.name)
+}
+
+levels(student7$address)
+summary(student7$address)
+```
+?table
+
+PARTITION DATASET
+
+```{r}
+library(caret)
+
+set.seed(161)
+ind <- createDataPartition(student7$newgrade, p = 0.7, list = F)
+
+train <- student7[ind, ]
+test <- student7[-ind, ]
+
+#rm(ind)
+
+# Verify stratification
+mean(train$newgrade)
+mean(test$newgrade)
+```
+
+
+TASK 4 - From the entire dataset, find a good interaction between school and another factor; include it in all subsequent models
+
+Interaction: The effect of predictor1 on target should change based on predictor2's value
+
+```{r}
+library(ggplot2)
+
+table(student7$school, student7$guardian)
+# ignoring factors that have a level with a low count is ok because that level will be further divided by school
+
+# Detect interactions graphically
+# we guess that family size has no interact with school
+ggplot(student7, aes(x = school, y = newgrade, fill = famsize)) +
+  geom_boxplot() +
+  facet_wrap(~ school, scales = "free")
+
+# guess activity interact with school. Maybe it depends on the activities offered in each school, thus impacting newgrade differently
+table(student7$school, student7$activities)  #enough obs.
+
+ggplot(student7, aes(x = school, y = newgrade, fill = activities)) +
+  geom_boxplot() +
+  facet_wrap(~ school, scales = "free")
+
+ggplot(student7, aes(x = school, y = newgrade)) +
+  geom_boxplot() +
+  facet_grid(activities ~ school, scales = "free")  #facet by school and activities
+```
+Findings: 
+1. no interaction between school and family size. For both school, the mean of size >3 is slightly higher than that of size<3
+2. the mean are close for GP but far apart for MHS.  The influence demonstrate an interaction between school and activities.
+
+
+TASK 5 - Run the following two models and compare them using RMSE
+
+```{r}
+mlr.mod1 <- lm(newgrade ~ . + school:activities, data = train)
+summary(mlr.mod1)
+# interaction term does not have amazing significance, but not terrible.
+# Mjob, study time, failures, and family supplement seems good predictor
+
+# Calculate test RMSE
+mlr.pred1 <- predict(mlr.mod1, newdata = test)
+
+sqrt(sum((test$newgrade - mlr.pred1)^2) / nrow(test))
+
+# Calculate training RMSE
+sqrt(sum((train$newgrade - predict(mlr.mod1))^2) / nrow(train))
+#  test RMSE is higher than the training RMSE, but the difference is not big, suggesting there is no severe overfitting. 
+```
+
+```{r}
+#exclude 6 variables from mod1
+mlr.mod2 <- lm(newgrade ~ . + school:activities - famrel - freetime - goout - Dalc - Walc - health, data = train)
+summary(mlr.mod2)
+
+# Calculate test RMSE
+mlr.pred2 <- predict(mlr.mod2, newdata = test)
+
+sqrt(sum((test$newgrade - mlr.pred2)^2) / nrow(test))
+
+# Calculate training RMSE
+sqrt(sum((train$newgrade - predict(mlr.mod2))^2) / nrow(train))
+#the second model is a little more accurate than the first, based on the test RMSE
+```
+
+
+TASK 6 - Run the following model; compare with previous models and explain one benefit it has over them
+
+```{r}
+mlr.mod3 <- lm(log(newgrade) ~ . + school:activities - famrel - freetime - goout - Dalc - Walc - health, data = train)
+summary(mlr.mod3)
+
+# Calculate test RMSE
+mlr.pred3 <- exp(predict(mlr.mod3, newdata = test))
+
+sqrt(sum((test$newgrade - mlr.pred3)^2) / nrow(test))
+```
+Findings:
+1.mod3 is the worst among the three
+2. a log-transformed target ensures a positive prediction after reversing transformation, which better matches newgrade range
+
+
+
+TASK 7 - Run model diagnostics on the last two models (i.e. check residuals)
+
+```{r}
+plot(mlr.mod2)
+# 1.For predictions less than 13, we have residuals around and exceeding positive 5. But for predictions greater than 13, there are no residuals just as positive, not even close. So residual spread is smaller 
+# 2. where predictions exceed 11, A good number of residuals are less than negative 5, but not many are greater than positive 5. The average here tends towards negative.
+#3.qq plot. tail has about 10 points out of 400 that are very off. Only a couple exceed 3 in absolute value, so nothing alarming.
+```
+
+```{r}
+plot(mlr.mod3)
+#newgrade following a lognormal distribution made sense from the perspective of matching support, but the data reveals the distribution is a bad fit
+```
+
+
+TASK 8 - Run two backward selection procedures with AIC, without and with binarization; comment on which seems easier to interpret
+
+```{r}
+drop1(mlr.mod2)
+#what the first round of backward selection with AIC would be
+
+library(MASS)
+stepAIC(mlr.mod2)
+
+ 
+bwd.mod1 <- lm(formula = newgrade ~ school + age + Medu + Mjob + Fjob + studytime + failures + schoolsup + famsup + activities + internet + school:activities, data = train)
+summary(bwd.mod1)
+
+#check with BIC
+stepAIC(mlr.mod2, k =log(nrow(train)))
+# only those three terms result in a worse model if we remove in round one. BIC clearly makes it more difficult for the predictors to remain compared to AIC.
+```
+
+```{r}
+library(caret)
+
+bin.vars <- c("Medu", "Fedu", "Mjob", "Fjob", "reason", "guardian", "traveltime", "studytime", "failures")
+#Binary factors do not need to be binarized because they already produce just one dummy variable
+
+bin.mod <- dummyVars(paste("~", paste(bin.vars, collapse = "+")), data = train, fullRank = T)
+
+trainBinarize <- cbind(train[, !(colnames(train) %in% bin.vars)], predict(bin.mod, newdata = train))
+#All columns mentioned in "bin.vars" are removed, and the invented dummy variables are added
+
+mlr.mod2b <- lm(newgrade ~ . + school:activities - famrel - freetime - goout - Dalc - Walc - health, data = trainBinarize)
+
+stepAIC(mlr.mod2b)
+
+bwd.mod2 <-lm(formula = newgrade ~ school + age + schoolsup + famsup + activities + 
+    internet + Medu.3 + Medu.4 + Mjob.health + Mjob.services + 
+    Fjob.at_home + Fjob.teacher + reason.reputation + traveltime.3 + 
+    studytime.3 + studytime.4 + failures.1 + failures.2 + failures.3 + 
+    school:activities, data = trainBinarize)
+summary(bwd.mod2)
+# e.g. Only two of the four total Mjob were chosen
+```
+
+first model is easier to interpret because it used 2 fewer variables to explain or
+the second model is easier to interpret because it has 3 fewer coefficients.
+
+
+TASK 9 - Run a lasso regression; compare models in this and previous task using RMSE 
+
+```{r}
+trainXmat <- model.matrix(newgrade ~ . + school:activities - famrel - freetime - goout - Dalc - Walc - health, data = train)
+# create a matrix for predictor
+
+library(glmnet)
+
+set.seed(161)
+
+las.cv <- cv.glmnet(x = trainXmat, y = train$newgrade, family = "gaussian", alpha = 1)
+# cross-validate to find an optimal lambda value
+plot(las.cv)
+#The dashed line on the left indicates the point where the error is minimized. At the top, we see this lambda produces a lasso with about 32 predictors from the 42 total.
+
+las.mod1 <- glmnet(x      = trainXmat,
+                   y      = train$newgrade,
+                   family = "gaussian",
+                   lambda = las.cv$lambda.min,
+                   alpha  = 1)
+
+las.mod1$a0
+las.mod1$beta
+#10 predictors with no estimated coefficients
+#remove the individual term for activities even though we retain its interaction with school
+```
+
+```{r}
+# Calculate (regular) backward's test RMSE
+bwd.pred1 <- predict(bwd.mod1, newdata = test)
+
+sqrt(sum((test$newgrade - bwd.pred1)^2) / nrow(test))
+
+# Calculate (binarized) backward's test RMSE
+testBinarize <- cbind(test[, !(colnames(test) %in% bin.vars)], predict(bin.mod, newdata = test))
+
+bwd.pred2 <- predict(bwd.mod2, newdata = testBinarize)
+
+sqrt(sum((test$newgrade - bwd.pred2)^2) / nrow(test))
+
+# Calculate lasso's test RMSE
+testXmat <- model.matrix(newgrade ~ . + school:activities - famrel - freetime - goout - Dalc - Walc - health, data = test)
+
+las.pred1 <- predict(las.mod1, newx = testXmat)
+#glmnet fit, argument is newx instead of newdata
+
+sqrt(sum((test$newgrade - las.pred1)^2) / nrow(test))
+```
+
+
+TASK 10 - Suggest two appropriate combinations of distribution and link function for a GLM
+
+#target domain: continously and positive 
+- gamma and log link
+- inverse gaussian and log link
+
+
+TASK 11 - For one combination from Task 10, run a stepwise selection procedure of your choice; assume we prefer interpretation over accuracy
+
+```{r}
+# Replace DISTRIBUTION and LINK below to match your choice.
+glm.mod1 <- glm(newgrade ~ . + school:activities - famrel - freetime - goout - Dalc - Walc - health,
+                family = Gamma(link = "log"),
+                data   = train)
+
+# An empty GLM is needed to implement stepAIC.
+# Replace DISTRIBUTION and LINK below to match your choice.
+glm.mod0 <- glm(newgrade ~ 1,
+                family = Gamma(link = "log"),
+                data   = train)
+
+library(MASS)
+
+# This will run forward selection with AIC.
+stepAIC(glm.mod0,               # Change to glm.mod1 for backward selection        
+        direction = "forward",  # Change to "backward" for backward selection
+        k         = log(nrow(train)),   # Change to log(nrow(train)) for BIC
+        scope     = list(upper = glm.mod1, lower = glm.mod0))
+
+fwd.mod1 <- glm(formula = newgrade ~ failures + Medu + famsup + internet, 
+    family = Gamma(link = "log"), data = train)
+summary(fwd.mod1)
+
+fwd.pred1 <- predict(fwd.mod1, newdata = test, type = "response")
+```
+
+
+TASK 12 - Run model diagnostics on the model from Task 11
+
+```{r}
+plot(fwd.mod1)
+#1st plot, no clear concern on trend and spread. Some very negative residuals without counterparts, signs of non-zero average
+#all the predictors are factors, column means many observations belong to a single prediction value
+#qq plot: left tail strip faraway from the superimposed line, and more outliners than we prefer
+#gamma might not be the best fit for newgrade
+```
+
+
+TASK 13 - Run the following three decision tree models and compare them using RMSE; do not change code
+
+```{r}
+library(rpart)
+library(rpart.plot)
+
+set.seed(161)
+tree.mod1 <- rpart(newgrade ~ ., data = train, method = "anova")
+
+rpart.plot(tree.mod1)
+tree.mod1
+#the risk of overfitting with a high number of terminal nodes.
+#unlike GLM, we do not have to specify the interaction between school and activities
+```
+
+```{r}
+tree.mod1$cptable
+cp.min <- tree.mod1$cptable[which.min(tree.mod1$cptable[, "xerror"]), "CP"]
+tree.mod2 <- prune.rpart(tree.mod1, cp = cp.min)
+
+rpart.plot(tree.mod2)
+
+#pruning the first model at the lowest cross-validation error
+#cp table shows that the lowest xerror is about 0.7525, which is the cross-validation error for the tree with 6 splits
+
+# Check out 1se for fun
+# plotcp(tree.mod1)
+```
+
+```{r}
+library(caret)
+
+set.seed(161)
+tree.cv1 <- train(y         = train$newgrade,
+                  x         = train[, colnames(train) != "newgrade"],
+                  method    = "rpart",
+                  trControl = trainControl(method = "cv", number = 10),
+                  metric    = "RMSE",
+                  tuneGrid  = expand.grid(cp = seq(0, 0.1, 0.005)),
+                  na.action = na.pass)
+tree.cv1$results
+plot(tree.cv1)
+#The RMSE is the lowest with a complexity parameter of 0.045 and 0.05
+
+tree.mod3 <- tree.cv1$finalModel
+# extract the model with lowest CV RMSE
+rpart.plot(tree.mod3)
+```
+
+```{r}
+# Calculate unpruned tree's training RMSE
+sqrt(sum((train$newgrade - predict(tree.mod1))^2) / nrow(train))
+
+# Calculate pruned tree's training RMSE
+sqrt(sum((train$newgrade - predict(tree.mod2))^2) / nrow(train))
+
+# Calculate third tree's training RMSE
+sqrt(sum((train$newgrade - predict(tree.mod3))^2) / nrow(train))
+```
+
+```{r}
+# Calculate unpruned tree's test RMSE 
+tree.pred1 <- predict(tree.mod1, newdata = test)
+
+sqrt(sum((test$newgrade - tree.pred1)^2) / nrow(test))
+
+# Calculate pruned tree's test RMSE
+tree.pred2 <- predict(tree.mod2, newdata = test)
+
+sqrt(sum((test$newgrade - tree.pred2)^2) / nrow(test))
+
+# Calculate third tree's test RMSE
+tree.pred3 <- predict(tree.mod3, newdata = test)
+
+sqrt(sum((test$newgrade - tree.pred3)^2) / nrow(test))
+```
+Findings:
+- the training RMSE is lowest for the first model since it is the most flexible
+- For the test RMSE, the second model has the lowest, followed by the third model, and then the first model. That is consistent with the u-shaped nature of our test error curve.
+
+TASK 14 - Construct a random forest model, comment as needed, and compare it with the best model from Task 13
+
+```{r}
+library(randomForest)
+
+set.seed(161)
+rf.mod1 <- randomForest(newgrade ~ .,
+                        data = train,
+                        importance = T,
+                        ntree = 250)
+```
+
+
+```{r}
+rf.mod1$importance
+
+ head(sort(rf.mod1$importance[, "%IncMSE"], decreasing = T))
+ head(sort(rf.mod1$importance[, "IncNodePurity"], decreasing = T))
+```
+Findings:
+- Mjob, failure and Medu are the most significant predictor for newgrade
+- Medu was likely undershadowed by Mjob and failure in single decision tree. This aligns with random forests' strength in allowing other important predictors to stand out, and further reduce the risk of correlated predictions
+
+```{r}
+# Examine the marginal effect of the most important predictors
+# Show predicted target as a function of a particular variable
+library(pdp)
+
+#Partial dependence plots shows the predicted target as a function of a particular variable that we isolate
+# Replace VARIABLE below based on previous output
+partial(rf.mod1, pred.var = "Mjob", plot = T)
+partial(rf.mod1, pred.var = "failures", plot = T)
+partial(rf.mod1, pred.var = "Medu", plot = T)
+```
+Findings:
+- mother's job = health services, or education --> newgrade is likely to be higher
+- A lower number of failures contributes to a higher newgrade. 
+- as the education level of the mother increases, newgrade increases as well
+
+```{r}
+# Calculate random forest's test RMSE
+rf.pred1 <- predict(rf.mod1, newdata = test)
+
+sqrt(sum((test$newgrade - rf.pred1)^2) / nrow(test))
+
+# Calculate best tree's test RMSE
+sqrt(sum((test$newgrade - tree.pred2)^2) / nrow(test))
+```
+Findings:
+- The test RMSE of the random forest model is about 2.77, lower than the test RMSE of the tree of about 3.42. Random forest model performs better than the single decision tree
+
+TASK 15 - Construct a boosted model, comment as needed, and compare it with the best model from Task 13
+
+```{r}
+library(gbm)
+
+set.seed(161)
+gbm.mod1 <- gbm(newgrade ~ .,
+                data              = train,
+                distribution      = "gaussian",
+                n.trees           = 100,
+                interaction.depth = 2,
+                shrinkage         = 0.1,
+                bag.fraction      = 0.5)
+
+summary(gbm.mod1)
+```
+Findings:
+- Mjob, failure and Medu are the most significant predictor for newgrade
+
+```{r}
+# Calculate boosted model's test RMSE
+gbm.pred1 <- predict(gbm.mod1, newdata = test)
+
+sqrt(sum((test$newgrade - gbm.pred1)^2) / nrow(test))
+
+# Calculate best tree's test RMSE
+sqrt(sum((test$newgrade - tree.pred2)^2) / nrow(test))
+```
+Findings:
+- better than the single decision tree. However, it does not do better than the random forest model.
+
+
+TASK 16 - Employ principal components analysis with factors famrel, freetime, goout, Dalc, Walc, and health to create a new feature; name the feature in an interpretable way
+
+```{r}
+summary(student7)
+
+pca.data <- student7[, c("famrel", "freetime", "goout", "Dalc", "Walc", "health")]
+pca1 <- prcomp(pca.data, scale. = T, center = T)
+pca1$rotation
+#walc and Dalc have the largest weight in PC1, they are the most correlated pair of features among all variables
+
+biplot(pca1)
+#in biplot chart, walc and Dalc are closer to each other than others
+
+cor(pca.data[,])
+#0.6222 is the strongest correlation
+
+summary(pca1)
+#the pc1 explains about 33.36% of the variability
+```
+
+Findings:
+
+```{r}
+# Add new feature to dataset
+student7$social <- pca1$x[, "PC1"]
+
+# Remove variables used
+student8 <- student7
+
+student8$famrel <- NULL
+student8$freetime <- NULL
+student8$goout <- NULL
+student8$Dalc <- NULL
+student8$Walc <- NULL
+student8$health <- NULL
+
+# Overwrite train and test
+train <- student8[ind, ]
+test <- student8[-ind, ]
+
+cor(student8$social,student8$newgrade)
+#has some correlation, but not very high
+```
+Findings:
+
+
+TASK 17 - Run the following models by including the new feature from Task 16; compare with counterpart models
+
+bwd.mod1 from Task 8
+```{r}
+mlr.mod4 <- lm(newgrade ~ . + school:activities, data = train)
+summary(mlr.mod4)
+
+# Perform backward selection procedures with AIC on mlr.mod4
+library(MASS)
+stepAIC(mlr.mod4)
+
+bwd.mod3 <- lm(formula = newgrade ~ school + sex + age + Medu + Mjob + Fjob + 
+    studytime + failures + schoolsup + famsup + activities + 
+    higher + internet + social + school:activities, data = train)
+summary(bwd.mod3)
+#social is significant
+
+bwd.pred3 <- predict(bwd.mod3, newdata = test)
+
+# Calculate test RMSEs
+sqrt(sum((test$newgrade - bwd.pred1)^2) / nrow(test))
+sqrt(sum((test$newgrade - bwd.pred3)^2) / nrow(test))
+#model with pc has slightly lower RMSE, adding the newly created feature improve the model
+```
+Findings:
+
+tree.mod1 from Task 13
+```{r}
+library(rpart)
+library(rpart.plot)
+
+set.seed(161)
+tree.mod4 <- rpart(newgrade ~ ., data = train, method = "anova")
+rpart.plot(tree.mod4)
+#social is used to split the tree, the split is quite high in tree, meaning it's quite important
+
+tree.pred4 <- predict(tree.mod4, newdata = test)
+
+# Calculate test RMSEs
+sqrt(sum((test$newgrade - tree.pred1)^2) / nrow(test))
+sqrt(sum((test$newgrade - tree.pred4)^2) / nrow(test))
+```
+Findings:
+
+
+TASK 18 - Recommend a final model from all fitted models and justify your recommendation both quantitatively and qualitatively; provide a non-technical explanation of the recommended model
+
+```{r}
+# Lasso regression from Task 9
+sqrt(sum((test$newgrade - las.pred1)^2) / nrow(test))
+
+# GLM with forward selection from Task 11
+sqrt(sum((test$newgrade - fwd.pred1)^2) / nrow(test))
+
+# Random forest from Task 14
+sqrt(sum((test$newgrade - rf.pred1)^2) / nrow(test))
+
+# MLR with backward selection + social from Task 17
+sqrt(sum((test$newgrade - bwd.pred3)^2) / nrow(test))
+
+# Single decision tree + social from Task 17
+sqrt(sum((test$newgrade - tree.pred4)^2) / nrow(test))
+```
+Findings:
+1.random forest model has the lowest RMSE
+2.added flexibility from this model is beneficial in predicting grades
+3.even though it's less interpretable than single tree, we are able to provide some interpretation by using variable importance and partial importance plots
+
+Chosen model: random forest
+

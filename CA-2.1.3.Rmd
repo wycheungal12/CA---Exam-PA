@@ -1,0 +1,107 @@
+INTRODUCTION TO ggplot2
+
+Data Visualization by Kieran Healy (ch. 3 and 4)
+Visit www.socviz.co
+
+```{r}
+library(ggplot2)
+```
+
+UNIVARIATE PLOTS
+
+Histogram
+```{r}
+ggplot(data = iris , mapping = aes(x = Sepal.Length )) +  # data, x variable
+  geom_histogram(bins = 20 ) +  # specify chart type and bin number
+  labs(x = "iris sepal length" )
+
+ggplot(data = iris , mapping = aes(x = Sepal.Width )) + 
+  geom_histogram(bins = 20 ) +  
+  labs(x = "iris sepal width" )
+
+ggplot(data = iris , mapping = aes(x = Petal.Length )) +  
+  geom_histogram(bins = 20 ) +  
+  labs(x = "iris petal length" )
+
+ggplot(data = iris , mapping = aes(x = Petal.Width )) +  
+  geom_histogram(bins = 20 ) +  
+  labs(x = "iris petal width" )
+```
+
+Bar chart
+```{r}
+ggplot(data = iris, mapping = aes(x = Species)) +
+  geom_bar() +
+  labs(x = "iris species")
+```
+
+Box plot
+```{r}
+ggplot(data = iris , mapping = aes(x = Sepal.Length )) + 
+  geom_boxplot() +  
+  labs(x = "iris sepal length" )
+
+ggplot(data = iris , mapping = aes(x = Sepal.Width )) + 
+  geom_boxplot() +  
+  labs(x = "iris sepal width" )
+
+ggplot(data = iris , mapping = aes(x = Petal.Length )) +  
+  geom_boxplot() +  
+  labs(x = "iris petal length" )
+
+ggplot(data = iris , mapping = aes(x = Petal.Width )) +  
+  geom_boxplot( ) +  
+  labs(x = "iris petal width" )
+```
+
+BIVARIATE PLOTS
+Target: Sepal Length (continuous)
+
+Scatterplot
+```{r}
+ggplot(data = iris, mapping = aes(x = Sepal.Width, y = Sepal.Length)) +     # specify 2 variables
+  geom_point() +
+  labs(x = "iris sepal width", y ="iris sepal length" )
+
+ggplot(data = iris, mapping = aes(x = Petal.Length, y = Sepal.Length)) +   
+  geom_point() +
+  labs(x = "iris petal length", y ="iris sepal length" )
+
+ggplot(data = iris, mapping = aes(x = Petal.Width, y = Sepal.Length)) +    
+  geom_point() +
+  labs(x = "iris petal width", y ="iris sepal length" )
+```
+
+Side-by-side histogram
+```{r}
+ggplot(data = iris, mapping = aes(x = Sepal.Length, fill = Species )) +
+  geom_histogram(position = "dodge", bins = 10) +
+  labs(x = )
+ # fill in histogram bars with different colors for different species
+```
+
+Side-by-side box plot   
+```{r}
+ggplot(data = iris, mapping = aes(x = Species, y = Sepal.Length)) +
+  geom_boxplot() +
+  labs(x ="iris species" , y = "iris sepal length")
+```
+
+Side-by-side bar chart
+```{r}
+ggplot(data = , mapping = aes(x = , fill = )) +
+  geom_bar(position = "dodge") +
+  labs(x = )
+```
+
+
+MULTIVARIATE PLOTS (FACETING)
+
+facet_wrap
+```{r}
+ggplot(data = iris, mapping = aes(x = Sepal.Width, y = Sepal.Length)) +     # specify 2 variables
+  geom_point() +
+  labs(x = "iris sepal width", y ="iris sepal length" )+
+facet_wrap(~Species, scales = "free")
+```
+
